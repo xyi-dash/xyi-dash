@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class PlayerLogService
@@ -17,6 +18,13 @@ class PlayerLogService
         'two' => 'Server 02',
         'three' => 'Server 03',
     ];
+
+    private const MOSCOW_TZ = 'Europe/Moscow';
+
+    // i hate this
+    private const REPUTATION_DATE_OFFSET_HOURS = 7;
+
+    private const REPUTATION_DATE2_OFFSET_HOURS = 24;
 
     private function conn(string $server): ?string
     {
@@ -337,8 +345,12 @@ class PlayerLogService
         $query = DB::connection($connection)->table('reputation');
 
         if ($dateFrom && $dateTo) {
-            $tsFrom = strtotime($dateFrom.' 00:00:00');
-            $tsTo = strtotime($dateTo.' 23:59:59');
+            $tsFrom = Carbon::createFromFormat('Y-m-d H:i:s', $dateFrom.' 00:00:00', self::MOSCOW_TZ)
+                ->addHours(self::REPUTATION_DATE2_OFFSET_HOURS)
+                ->timestamp;
+            $tsTo = Carbon::createFromFormat('Y-m-d H:i:s', $dateTo.' 23:59:59', self::MOSCOW_TZ)
+                ->addHours(self::REPUTATION_DATE2_OFFSET_HOURS)
+                ->timestamp;
             $query->where('Date2', '>=', $tsFrom)
                 ->where('Date2', '<=', $tsTo);
         }
@@ -370,7 +382,7 @@ class PlayerLogService
                     'to_is_banned' => isset($banList[$row->B]),
                     'type' => $row->Repa,
                     'comment' => $row->Comment ?: null,
-                    'date' => $row->Date ?? null,
+                    'date' => $this->formatReputationDate($row->Date2 ?? null, $row->Date ?? null),
                 ];
             })
             ->toArray();
@@ -699,6 +711,29 @@ class PlayerLogService
             ->update(['Reason' => $reason]);
 
         return $affected > 0;
+    }
+
+    private function formatReputationDate(mixed $date2, ?string $fallbackDate): ?string
+    {
+        if (is_numeric($date2) && (int) $date2 > 0) {
+            return Carbon::createFromTimestampUTC((int) $date2)
+                ->setTimezone(self::MOSCOW_TZ)
+                ->subHours(self::REPUTATION_DATE2_OFFSET_HOURS)
+                ->format('d.m.Y - H:i');
+        }
+
+        if ($fallbackDate) {
+            foreach (['d.m.Y - H:i', 'd.m.Y H:i:s', 'd.m.Y H:i'] as $format) {
+                try {
+                    return Carbon::createFromFormat($format, $fallbackDate, self::MOSCOW_TZ)
+                        ->subHours(self::REPUTATION_DATE_OFFSET_HOURS)
+                        ->format('d.m.Y - H:i');
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
+        return $fallbackDate;
     }
 
     public function getBanById(string $server, int $banId): ?array
