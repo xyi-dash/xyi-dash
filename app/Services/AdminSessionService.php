@@ -45,6 +45,13 @@ class AdminSessionService
             ->update(['last_activity_at' => now()]);
     }
 
+    public function touchAllUnlocked(User $user): void
+    {
+        AdminSession::forUser($user->id)
+            ->where('last_activity_at', '>=', now()->subMinutes(self::SESSION_TTL_MINUTES))
+            ->update(['last_activity_at' => now()]);
+    }
+
     public function getUnlockedServers(User $user): array
     {
         return AdminSession::forUser($user->id)

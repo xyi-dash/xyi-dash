@@ -52,6 +52,8 @@ class ControlPanelAuth
                 ->with('error', 'unlock a server first. reimu demands tribute.');
         }
 
+        $this->adminSession->touchAllUnlocked($user);
+
         // must be on control_panel_users list
         if (! ControlPanelUser::hasAccess($user->game_account_name, $user->server)) {
             abort(403, 'hakurei barrier: control panel access denied. you need explicit permission from the shrine maidens.');
