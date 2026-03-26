@@ -129,6 +129,18 @@ const router = createRouter({
                     meta: { requiresLevel: 7 }
                 },
                 {
+                    path: 'extended/admin-warnings',
+                    name: 'extended-admin-warnings',
+                    component: () => import('@/views/extended/AdminWarnings.vue'),
+                    meta: { requiresLevel: 6 }
+                },
+                {
+                    path: 'extended/player-bans',
+                    name: 'extended-player-bans',
+                    component: () => import('@/views/extended/PlayerBans.vue'),
+                    meta: { requiresLevel: 6 }
+                },
+                {
                     path: 'extended/admin-cards',
                     name: 'extended-admin-cards',
                     component: () => import('@/views/extended/AdminCards.vue'),
@@ -138,6 +150,12 @@ const router = createRouter({
                     path: 'extended/pending-cards',
                     name: 'extended-pending-cards',
                     component: () => import('@/views/extended/PendingCards.vue'),
+                    meta: { requiresLevel: 7 }
+                },
+                {
+                    path: 'extended/card-history',
+                    name: 'extended-card-history',
+                    component: () => import('@/views/extended/CardHistory.vue'),
                     meta: { requiresLevel: 7 }
                 },
                 {

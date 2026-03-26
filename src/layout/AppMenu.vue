@@ -58,15 +58,28 @@ const model = computed(() => {
     if (authStore.admin && authStore.admin.level >= 6) {
         const extendedSection = items.find((i) => i.label === t('nav.extended'));
         if (extendedSection) {
-            extendedSection.items.push({ label: 'Карточки', icon: 'pi pi-fw pi-file', to: '/extended/admin-cards' });
+            extendedSection.items.push({
+                label: 'Карточки',
+                icon: 'pi pi-fw pi-file',
+                items: [
+                    { label: 'Предупреждения администраторам', icon: 'pi pi-fw pi-exclamation-triangle', to: '/extended/admin-warnings' },
+                    { label: 'Блокировки игроков', icon: 'pi pi-fw pi-ban', to: '/extended/player-bans' }
+                ]
+            });
         }
     }
 
-    // Pending Cards for level 7+
+    // Pending Cards and History for level 7+
     if (authStore.canViewRemoved) {
         const extendedSection = items.find((i) => i.label === t('nav.extended'));
         if (extendedSection) {
-            extendedSection.items.push({ label: 'Карточки в ожидании', icon: 'pi pi-fw pi-clock', to: '/extended/pending-cards' });
+            const cardsSubmenu = extendedSection.items.find((item) => item.label === 'Карточки');
+            if (cardsSubmenu && cardsSubmenu.items) {
+                cardsSubmenu.items.push(
+                    { label: 'Карточки в ожидании', icon: 'pi pi-fw pi-clock', to: '/extended/pending-cards' },
+                    { label: 'История карточек', icon: 'pi pi-fw pi-history', to: '/extended/card-history' }
+                );
+            }
         }
     }
 
