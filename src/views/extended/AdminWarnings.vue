@@ -2,11 +2,11 @@
   <div class="card">
     <div class="flex items-center gap-2 mb-6">
       <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
-      <div class="font-semibold text-xl">Предупреждения администраторам</div>
+      <div class="font-semibold text-xl">Действия с администрацией</div>
     </div>
 
     <div class="text-muted-color mb-6">
-      Создание заявки на выдачу или снятие предупреждения администратору
+      Создание заявки на действия с администраторами (предупреждения, изменение уровня)
     </div>
 
     <div class="grid grid-cols-12 gap-6">
@@ -119,6 +119,8 @@ const loading = ref(false);
 const actionOptions = [
   { label: 'Выдача предупреждения', value: 'warning_add' },
   { label: 'Снятие предупреждения', value: 'warning_remove' },
+  { label: 'Повышение уровня', value: 'level_up' },
+  { label: 'Понижение уровня', value: 'level_down' },
 ];
 
 const isFormValid = computed(() => {

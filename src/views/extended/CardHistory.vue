@@ -189,6 +189,8 @@ const actionTypeOptions = [
   { label: 'Все действия', value: null },
   { label: 'Выдача предупреждения', value: 'warning_add' },
   { label: 'Снятие предупреждения', value: 'warning_remove' },
+  { label: 'Повышение уровня', value: 'level_up' },
+  { label: 'Понижение уровня', value: 'level_down' },
   { label: 'Вечная блокировка', value: 'permanent_ban' },
 ];
 
@@ -201,6 +203,8 @@ const getActionLabel = (actionType) => {
   const labels = {
     warning_add: 'Выдача предупреждения',
     warning_remove: 'Снятие предупреждения',
+    level_up: 'Повышение уровня',
+    level_down: 'Понижение уровня',
     permanent_ban: 'Вечная блокировка',
   };
   return labels[actionType] || actionType;
@@ -210,6 +214,8 @@ const getActionSeverity = (actionType) => {
   const severities = {
     warning_add: 'warn',
     warning_remove: 'success',
+    level_up: 'success',
+    level_down: 'warn',
     permanent_ban: 'danger',
   };
   return severities[actionType] || 'info';
@@ -219,6 +225,8 @@ const getActionIcon = (actionType) => {
   const icons = {
     warning_add: 'pi pi-exclamation-triangle',
     warning_remove: 'pi pi-check-circle',
+    level_up: 'pi pi-arrow-up',
+    level_down: 'pi pi-arrow-down',
     permanent_ban: 'pi pi-ban',
   };
   return icons[actionType] || 'pi pi-info-circle';

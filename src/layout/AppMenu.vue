@@ -59,7 +59,7 @@ const model = computed(() => {
         const extendedSection = items.find((i) => i.label === t('nav.extended'));
         if (extendedSection) {
             const cardsItems = [
-                { label: 'Предупреждения администраторам', icon: 'pi pi-fw pi-exclamation-triangle', to: '/extended/admin-warnings' },
+                { label: 'Действия с администрацией', icon: 'pi pi-fw pi-exclamation-triangle', to: '/extended/admin-warnings' },
                 { label: 'Блокировки игроков', icon: 'pi pi-fw pi-ban', to: '/extended/player-bans' }
             ];
 
