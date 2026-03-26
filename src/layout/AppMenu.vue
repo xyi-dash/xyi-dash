@@ -48,9 +48,26 @@ const model = computed(() => {
                 { label: t('nav.ip_bans'), icon: 'pi pi-fw pi-globe', to: '/extended/ip-bans' },
                 { label: t('nav.matchmaking'), icon: 'pi pi-fw pi-chart-bar', to: '/extended/matchmaking' },
                 { label: t('nav.money'), icon: 'pi pi-fw pi-dollar', to: '/extended/money' },
-                { label: t('nav.accessories'), icon: 'pi pi-fw pi-box', to: '/extended/accessories' }
+                { label: t('nav.accessories'), icon: 'pi pi-fw pi-box', to: '/extended/accessories' },
+                { label: 'Черный список', icon: 'pi pi-fw pi-times-circle', to: '/extended/blacklist' }
             ]
         });
+    }
+
+    // Admin Cards for level 6+
+    if (authStore.admin && authStore.admin.level >= 6) {
+        const extendedSection = items.find((i) => i.label === t('nav.extended'));
+        if (extendedSection) {
+            extendedSection.items.push({ label: 'Карточки', icon: 'pi pi-fw pi-file', to: '/extended/admin-cards' });
+        }
+    }
+
+    // Pending Cards for level 7+
+    if (authStore.canViewRemoved) {
+        const extendedSection = items.find((i) => i.label === t('nav.extended'));
+        if (extendedSection) {
+            extendedSection.items.push({ label: 'Карточки в ожидании', icon: 'pi pi-fw pi-clock', to: '/extended/pending-cards' });
+        }
     }
 
     if (authStore.canViewGAActions) {

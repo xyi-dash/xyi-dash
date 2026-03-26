@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
 import { setLocale, getLocale } from '@/i18n';
 import AppConfigurator from './AppConfigurator.vue';
+import Changelog from '@/components/Changelog.vue';
 import api, { DASHBOARD_URL } from '@/service/api';
 
 const { t } = useI18n();
@@ -15,6 +16,7 @@ const router = useRouter();
 
 const currentLocale = ref(getLocale());
 const langMenu = ref();
+const changelogVisible = ref(false);
 
 const languageOptions = [
     { label: 'Русский', value: 'ru', code: 'RU' },
@@ -84,6 +86,9 @@ async function goToControlPanel() {
             </div>
 
             <div class="layout-config-menu">
+                <button type="button" class="layout-topbar-action" @click="changelogVisible = true">
+                    <i class="pi pi-list"></i>
+                </button>
                 <button v-if="authStore.canAccessCP" type="button" class="layout-topbar-action" @click="goToControlPanel">
                     <i class="pi pi-cog"></i>
                 </button>
@@ -119,6 +124,10 @@ async function goToControlPanel() {
 
             <div class="layout-topbar-menu hidden lg:block">
                 <div class="layout-topbar-menu-content">
+                    <button type="button" class="layout-topbar-action layout-mobile-item" @click="changelogVisible = true">
+                        <i class="pi pi-list"></i>
+                        <span>Changelog</span>
+                    </button>
                     <button type="button" class="layout-topbar-action layout-mobile-item" @click="toggleServerMenu">
                         <i class="pi pi-server"></i>
                         <span>{{ currentServerLabel }}</span>
@@ -167,5 +176,7 @@ async function goToControlPanel() {
                 </template>
             </Menu>
         </div>
+
+        <Changelog v-model:visible="changelogVisible" />
     </div>
 </template>
