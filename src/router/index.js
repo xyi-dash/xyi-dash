@@ -123,6 +123,24 @@ const router = createRouter({
                     meta: { requiresLevel: 7 }
                 },
                 {
+                    path: 'extended/blacklist',
+                    name: 'extended-blacklist',
+                    component: () => import('@/views/extended/Blacklist.vue'),
+                    meta: { requiresLevel: 7 }
+                },
+                {
+                    path: 'extended/admin-cards',
+                    name: 'extended-admin-cards',
+                    component: () => import('@/views/extended/AdminCards.vue'),
+                    meta: { requiresLevel: 6 }
+                },
+                {
+                    path: 'extended/pending-cards',
+                    name: 'extended-pending-cards',
+                    component: () => import('@/views/extended/PendingCards.vue'),
+                    meta: { requiresLevel: 7 }
+                },
+                {
                     path: 'manage/news',
                     name: 'manage-news',
                     component: () => import('@/views/manage/News.vue'),

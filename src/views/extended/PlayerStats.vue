@@ -4,14 +4,19 @@ import { useAuthStore } from '@/stores/auth';
 import { onMounted, ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { useToast } from 'primevue/usetoast';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const { t } = useI18n();
+const toast = useToast();
 
 const loading = ref(true);
 const player = ref(null);
+const editMode = ref(false);
+const saving = ref(false);
+const editData = ref({});
 
 const getRankLabel = (rank) => t(`extended.player_stats.ranks.${rank}`);
 
@@ -37,6 +42,74 @@ async function loadPlayer() {
 }
 
 const goBack = () => router.push({ name: 'extended-players' });
+
+function startEdit() {
+    editData.value = {
+        name: player.value.name,
+        level: player.value.level,
+        cash: player.value.cash,
+        donate: player.value.donate?.money || 0,
+        kills: player.value.kills,
+        deaths: player.value.deaths,
+        google_type: player.value.security?.google_type || 0,
+        google_key: player.value.security?.google_key || ''
+    };
+    if (player.value.gangwar) {
+        editData.value.gangwar = {
+            grove: player.value.gangwar.grove || 0,
+            ballas: player.value.gangwar.ballas || 0,
+            vagos: player.value.gangwar.vagos || 0,
+            aztec: player.value.gangwar.aztec || 0
+        };
+    }
+    if (player.value.matchmaking) {
+        editData.value.matchmaking = {
+            elo: player.value.matchmaking.elo || 0,
+            games: player.value.matchmaking.games || 0,
+            wins: player.value.matchmaking.wins || 0,
+            kills: player.value.matchmaking.kills || 0,
+            deaths: player.value.matchmaking.deaths || 0,
+            mvp: player.value.matchmaking.mvp || 0
+        };
+    }
+    editMode.value = true;
+}
+
+function cancelEdit() {
+    editMode.value = false;
+    editData.value = {};
+}
+
+async function saveEdit() {
+    // Валидация
+    if (editData.value.level < 1) {
+        toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Уровень должен быть больше 0', life: 3000 });
+        return;
+    }
+    if (editData.value.cash < 0 || editData.value.donate < 0) {
+        toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Деньги и донат не могут быть отрицательными', life: 3000 });
+        return;
+    }
+    if (editData.value.kills < 0 || editData.value.deaths < 0) {
+        toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Убийства и смерти не могут быть отрицательными', life: 3000 });
+        return;
+    }
+
+    saving.value = true;
+    try {
+        const serverParam = authStore.currentServer ? `?server=${authStore.currentServer}` : '';
+        await api.put(`/admin/players/${route.params.id}${serverParam}`, editData.value);
+        toast.add({ severity: 'success', summary: 'Успешно', detail: 'Статистика игрока обновлена', life: 3000 });
+        await loadPlayer();
+        editMode.value = false;
+        editData.value = {};
+    } catch (error) {
+        console.error('save failed', error);
+        toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Не удалось сохранить изменения', life: 3000 });
+    } finally {
+        saving.value = false;
+    }
+}
 </script>
 
 <template>
@@ -52,7 +125,10 @@ const goBack = () => router.push({ name: 'extended-players' });
             <template v-else-if="player">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">{{ player.name }}</div>
+                        <div v-if="editMode" class="mb-2">
+                            <InputText v-model="editData.name" class="text-2xl font-medium w-full" />
+                        </div>
+                        <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">{{ player.name }}</div>
                         <div class="flex flex-wrap gap-4 text-sm text-muted-color">
                             <span>ID: <span class="font-mono text-surface-900 dark:text-surface-0">{{ player.id }}</span></span>
                             <span>{{ $t('extended.player_stats.registered') }}: <span class="text-surface-900 dark:text-surface-0">{{ player.registered_at }}</span></span>
@@ -64,6 +140,14 @@ const goBack = () => router.push({ name: 'extended-players' });
                         <Tag v-if="player.vip" severity="warn">VIP</Tag>
                         <Tag v-if="player.premium" severity="success">PREMIUM</Tag>
                     </div>
+                </div>
+                
+                <div v-if="!editMode && authStore.admin?.level >= 8" class="flex justify-end mt-4">
+                    <Button label="Редактировать" icon="pi pi-pencil" @click="startEdit" />
+                </div>
+                <div v-if="editMode" class="flex justify-end gap-2 mt-4">
+                    <Button label="Отмена" icon="pi pi-times" severity="secondary" @click="cancelEdit" :disabled="saving" />
+                    <Button label="Сохранить" icon="pi pi-check" @click="saveEdit" :loading="saving" />
                 </div>
             </template>
 
@@ -78,9 +162,10 @@ const goBack = () => router.push({ name: 'extended-players' });
                 <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                     <div class="card mb-0">
                         <div class="flex justify-between mb-4">
-                            <div>
+                            <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.player_stats.level') }}</span>
-                                <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ player.level }}</div>
+                                <InputNumber v-if="editMode" v-model="editData.level" :min="1" :max="999" class="w-full" />
+                                <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ player.level }}</div>
                             </div>
                             <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
                                 <i class="pi pi-star text-blue-500 text-xl!"></i>
@@ -91,9 +176,10 @@ const goBack = () => router.push({ name: 'extended-players' });
                 <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                     <div class="card mb-0">
                         <div class="flex justify-between mb-4">
-                            <div>
+                            <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.player_stats.cash') }}</span>
-                                <div class="text-green-500 font-medium text-xl">${{ player.cash?.toLocaleString() }}</div>
+                                <InputNumber v-if="editMode" v-model="editData.cash" :min="0" mode="currency" currency="USD" locale="en-US" class="w-full" />
+                                <div v-else class="text-green-500 font-medium text-xl">${{ player.cash?.toLocaleString() }}</div>
                             </div>
                             <div class="flex items-center justify-center bg-green-100 dark:bg-green-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
                                 <i class="pi pi-dollar text-green-500 text-xl!"></i>
@@ -104,9 +190,10 @@ const goBack = () => router.push({ name: 'extended-players' });
                 <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                     <div class="card mb-0">
                         <div class="flex justify-between mb-4">
-                            <div>
+                            <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.player_stats.donate') }}</span>
-                                <div class="text-yellow-500 font-medium text-xl">{{ player.donate?.money || 0 }} ₽</div>
+                                <InputNumber v-if="editMode" v-model="editData.donate" :min="0" suffix=" ₽" class="w-full" />
+                                <div v-else class="text-yellow-500 font-medium text-xl">{{ player.donate?.money || 0 }} ₽</div>
                             </div>
                             <div class="flex items-center justify-center bg-yellow-100 dark:bg-yellow-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
                                 <i class="pi pi-credit-card text-yellow-500 text-xl!"></i>
@@ -136,11 +223,17 @@ const goBack = () => router.push({ name: 'extended-players' });
                         <ul class="list-none p-0 m-0">
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.kills') }}</div>
-                                <div class="text-surface-900 dark:text-surface-0 font-medium w-1/2">{{ player.kills?.toLocaleString() }}</div>
+                                <div class="w-1/2">
+                                    <InputNumber v-if="editMode" v-model="editData.kills" :min="0" class="w-full" />
+                                    <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.kills?.toLocaleString() }}</div>
+                                </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.deaths') }}</div>
-                                <div class="text-surface-900 dark:text-surface-0 font-medium w-1/2">{{ player.deaths?.toLocaleString() }}</div>
+                                <div class="w-1/2">
+                                    <InputNumber v-if="editMode" v-model="editData.deaths" :min="0" class="w-full" />
+                                    <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.deaths?.toLocaleString() }}</div>
+                                </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.reputation') }}</div>
@@ -158,19 +251,31 @@ const goBack = () => router.push({ name: 'extended-players' });
                         <ul class="list-none p-0 m-0">
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Grove Street</div>
-                                <div class="text-green-500 font-medium w-1/2">{{ player.gangwar.grove?.toLocaleString() }}</div>
+                                <div class="w-1/2">
+                                    <InputNumber v-if="editMode" v-model="editData.gangwar.grove" :min="0" class="w-full" />
+                                    <div v-else class="text-green-500 font-medium">{{ player.gangwar.grove?.toLocaleString() }}</div>
+                                </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Ballas</div>
-                                <div class="text-purple-500 font-medium w-1/2">{{ player.gangwar.ballas?.toLocaleString() }}</div>
+                                <div class="w-1/2">
+                                    <InputNumber v-if="editMode" v-model="editData.gangwar.ballas" :min="0" class="w-full" />
+                                    <div v-else class="text-purple-500 font-medium">{{ player.gangwar.ballas?.toLocaleString() }}</div>
+                                </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Vagos</div>
-                                <div class="text-yellow-500 font-medium w-1/2">{{ player.gangwar.vagos?.toLocaleString() }}</div>
+                                <div class="w-1/2">
+                                    <InputNumber v-if="editMode" v-model="editData.gangwar.vagos" :min="0" class="w-full" />
+                                    <div v-else class="text-yellow-500 font-medium">{{ player.gangwar.vagos?.toLocaleString() }}</div>
+                                </div>
                             </li>
                             <li class="flex items-center py-4">
                                 <div class="text-muted-color w-1/2">Aztecas</div>
-                                <div class="text-cyan-500 font-medium w-1/2">{{ player.gangwar.aztec?.toLocaleString() }}</div>
+                                <div class="w-1/2">
+                                    <InputNumber v-if="editMode" v-model="editData.gangwar.aztec" :min="0" class="w-full" />
+                                    <div v-else class="text-cyan-500 font-medium">{{ player.gangwar.aztec?.toLocaleString() }}</div>
+                                </div>
                             </li>
                         </ul>
                     </div>
@@ -203,9 +308,28 @@ const goBack = () => router.push({ name: 'extended-players' });
                                     </Tag>
                                 </div>
                             </li>
-                            <li class="flex items-center py-4">
+                            <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.vid_kod') }}</div>
                                 <div class="text-surface-900 dark:text-surface-0 font-medium w-1/2">{{ player.security?.vid_kod === 0 ? $t('extended.player_stats.vid_kod_every') : $t('extended.player_stats.vid_kod_ip') }}</div>
+                            </li>
+                            <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
+                                <div class="text-muted-color w-1/2">Google Authenticator</div>
+                                <div class="w-1/2">
+                                    <Dropdown v-if="editMode" v-model="editData.google_type" :options="[{label: 'Да', value: 1}, {label: 'Нет', value: 0}]" optionLabel="label" optionValue="value" class="w-full" />
+                                    <Tag v-else :severity="player.security?.google_type === 1 ? 'success' : 'danger'" size="small">
+                                        {{ player.security?.google_type === 1 ? 'Да' : 'Нет' }}
+                                    </Tag>
+                                </div>
+                            </li>
+                            <li class="flex items-center py-4">
+                                <div class="text-muted-color w-1/2">Google Key</div>
+                                <div class="w-1/2">
+                                    <div v-if="editMode" class="flex gap-2">
+                                        <InputText v-model="editData.google_key" class="flex-1" placeholder="Google Key" />
+                                        <Button icon="pi pi-trash" severity="danger" size="small" @click="editData.google_key = ''" />
+                                    </div>
+                                    <div v-else class="text-surface-900 dark:text-surface-0 font-mono">{{ player.security?.google_key && player.security.google_key !== '-' ? player.security.google_key : '-' }}</div>
+                                </div>
                             </li>
                         </ul>
                     </div>
@@ -235,9 +359,10 @@ const goBack = () => router.push({ name: 'extended-players' });
                 <div class="grid grid-cols-12 gap-8">
                     <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                         <div class="flex justify-between mb-4">
-                            <div>
+                            <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">ELO</span>
-                                <div class="font-medium text-xl" :class="{ 'text-green-500': player.matchmaking.elo >= 1200, 'text-yellow-500': player.matchmaking.elo >= 1000 && player.matchmaking.elo < 1200, 'text-red-500': player.matchmaking.elo < 1000 }">{{ player.matchmaking.elo }}</div>
+                                <InputNumber v-if="editMode" v-model="editData.matchmaking.elo" :min="0" class="w-full" />
+                                <div v-else class="font-medium text-xl" :class="{ 'text-green-500': player.matchmaking.elo >= 1200, 'text-yellow-500': player.matchmaking.elo >= 1000 && player.matchmaking.elo < 1200, 'text-red-500': player.matchmaking.elo < 1000 }">{{ player.matchmaking.elo }}</div>
                             </div>
                             <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
                                 <i class="pi pi-bolt text-purple-500 text-xl!"></i>
@@ -246,17 +371,19 @@ const goBack = () => router.push({ name: 'extended-players' });
                     </div>
                     <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                         <div class="flex justify-between mb-4">
-                            <div>
+                            <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.matchmaking.games') }}</span>
-                                <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ player.matchmaking.games }}</div>
+                                <InputNumber v-if="editMode" v-model="editData.matchmaking.games" :min="0" class="w-full" />
+                                <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ player.matchmaking.games }}</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                         <div class="flex justify-between mb-4">
-                            <div>
+                            <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.matchmaking.wins') }}</span>
-                                <div class="text-green-500 font-medium text-xl">{{ player.matchmaking.wins }}</div>
+                                <InputNumber v-if="editMode" v-model="editData.matchmaking.wins" :min="0" class="w-full" />
+                                <div v-else class="text-green-500 font-medium text-xl">{{ player.matchmaking.wins }}</div>
                             </div>
                         </div>
                     </div>
@@ -272,13 +399,22 @@ const goBack = () => router.push({ name: 'extended-players' });
                 <ul class="list-none p-0 m-0 mt-4">
                     <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                         <div class="text-muted-color w-1/4">{{ $t('extended.matchmaking.kills') }}</div>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium w-1/4">{{ player.matchmaking.kills }}</div>
+                        <div class="w-1/4">
+                            <InputNumber v-if="editMode" v-model="editData.matchmaking.kills" :min="0" class="w-full" />
+                            <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.matchmaking.kills }}</div>
+                        </div>
                         <div class="text-muted-color w-1/4">{{ $t('extended.matchmaking.deaths') }}</div>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium w-1/4">{{ player.matchmaking.deaths }}</div>
+                        <div class="w-1/4">
+                            <InputNumber v-if="editMode" v-model="editData.matchmaking.deaths" :min="0" class="w-full" />
+                            <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.matchmaking.deaths }}</div>
+                        </div>
                     </li>
                     <li class="flex items-center py-4">
                         <div class="text-muted-color w-1/4">{{ $t('extended.matchmaking.mvp') }}</div>
-                        <div class="text-yellow-500 font-medium w-1/4">{{ player.matchmaking.mvp }}</div>
+                        <div class="w-1/4">
+                            <InputNumber v-if="editMode" v-model="editData.matchmaking.mvp" :min="0" class="w-full" />
+                            <div v-else class="text-yellow-500 font-medium">{{ player.matchmaking.mvp }}</div>
+                        </div>
                         <div class="text-muted-color w-1/4">{{ $t('extended.player_stats.mm_time') }}</div>
                         <div class="text-surface-900 dark:text-surface-0 font-medium w-1/4">{{ player.matchmaking.game_time || '0ч' }}</div>
                     </li>
