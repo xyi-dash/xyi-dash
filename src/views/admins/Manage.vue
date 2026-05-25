@@ -16,10 +16,12 @@ const { isDarkTheme } = useLayout();
 
 const loading = ref(true);
 const executing = ref(false);
+const updatingLogAccess = ref(false);
 const admin = ref(null);
 const actions = ref([]);
 const selectedAction = ref('');
 const reason = ref('');
+const canManageLogAccess = ref(false);
 
 const normHistory = ref(null);
 const chartData = ref(null);
@@ -27,6 +29,11 @@ const chartOptions = ref(null);
 
 // these actions need reasons. unlike my decisions to work in frontend. those need therapy.
 const actionsNeedingReason = ['warn', 'unwarn', 'promote', 'demote', 'remove', 'give_ga', 'remove_ga'];
+
+const canShowLogAccessToggle = computed(() => {
+    if (!admin.value || Number(admin.value.level) !== 6 || admin.value.is_ga) return false;
+    return canManageLogAccess.value || authStore.admin?.level >= 7 || actions.value.includes('promote') || actions.value.includes('give_ga');
+});
 
 const getActionLabel = (action) => t(`manage.action_labels.${action}`);
 
@@ -42,6 +49,7 @@ async function loadAdminData() {
         const { data } = await api.get(`/admin/manage/${encodeURIComponent(route.params.name)}/actions${serverParam}`);
         admin.value = data.admin;
         actions.value = data.actions;
+        canManageLogAccess.value = data.can_manage_log_access || false;
     } catch (error) {
         toast.add({
             severity: 'error',
@@ -204,6 +212,37 @@ const weeklyMet = computed(() => {
     return weeklyTotal.value >= weeklyNorm.value;
 });
 
+async function updateLogAccess(enabled) {
+    if (!admin.value || !canShowLogAccessToggle.value) return;
+
+    updatingLogAccess.value = true;
+    try {
+        const serverParam = authStore.currentServer ? `?server=${authStore.currentServer}` : '';
+        const { data } = await api.patch(`/admin/manage/${encodeURIComponent(admin.value.name)}/log-access${serverParam}`, {
+            enabled
+        });
+
+        admin.value = data.admin;
+
+        toast.add({
+            severity: 'success',
+            summary: t('common.success'),
+            detail: t('manage.log_access_updated'),
+            life: 3000
+        });
+    } catch (error) {
+        admin.value.has_log_access = !enabled;
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: t('manage.log_access_failed'),
+            life: 5000
+        });
+    } finally {
+        updatingLogAccess.value = false;
+    }
+}
+
 async function executeAction() {
     if (!selectedAction.value) return;
 
@@ -345,7 +384,13 @@ function goBack() {
             <div class="grid grid-cols-12 gap-8">
                 <div class="col-span-12 xl:col-span-8">
                     <div class="card h-full">
-                        <div class="font-semibold text-xl mb-4">{{ $t('manage.actions') }}</div>
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <div class="font-semibold text-xl">{{ $t('manage.actions') }}</div>
+                            <label v-if="canShowLogAccessToggle" class="flex items-center gap-2 cursor-pointer select-none">
+                                <Checkbox v-model="admin.has_log_access" :binary="true" :disabled="updatingLogAccess" @update:modelValue="updateLogAccess" />
+                                <span class="text-sm text-muted-color">{{ $t('manage.grant_log_access') }}</span>
+                            </label>
+                        </div>
 
                         <div v-if="actions.length" class="flex flex-col gap-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

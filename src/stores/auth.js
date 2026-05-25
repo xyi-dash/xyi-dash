@@ -13,6 +13,11 @@ export const useAuthStore = defineStore('auth', () => {
     
     let keepAliveInterval = null;
 
+    const canViewAdminActions = computed(() => {
+        if (!admin.value) return false;
+        return admin.value.level >= 7 || (admin.value.level === 6 && (admin.value.is_ga || admin.value.has_log_access));
+    });
+
     const canViewLogs = computed(() => {
         if (!admin.value) return false;
         return admin.value.level >= 7 || (admin.value.level === 6 && admin.value.is_ga);
@@ -32,6 +37,14 @@ export const useAuthStore = defineStore('auth', () => {
         if (!admin.value) return false;
         return admin.value.level === 8 && admin.value.is_ga;
     });
+
+    function normalizeServerKey(server) {
+        const value = String(server || '').toLowerCase();
+        if (value === '1' || value === '01') return 'one';
+        if (value === '2' || value === '02') return 'two';
+        if (value === '3' || value === '03') return 'three';
+        return value;
+    }
 
     const isAuthenticated = computed(() => !!user.value && !!localStorage.getItem('admin_token'));
 
@@ -106,11 +119,12 @@ export const useAuthStore = defineStore('auth', () => {
             canAccessCP.value = data.can_access_cp || false;
 
             if (unlockedServers.value.length > 0) {
-                const serverInfo = data.admin_on_servers?.find((s) => s.server === currentServer.value);
+                const serverInfo = data.admin_on_servers?.find((s) => normalizeServerKey(s.server) === normalizeServerKey(currentServer.value));
                 if (serverInfo) {
                     admin.value = {
                         level: serverInfo.level,
-                        is_ga: serverInfo.is_ga
+                        is_ga: serverInfo.is_ga,
+                        has_log_access: serverInfo.has_log_access
                     };
                 }
             }
@@ -133,7 +147,7 @@ export const useAuthStore = defineStore('auth', () => {
             unlockedServers.value = data.unlocked_servers || [];
             localStorage.setItem('unlocked_servers', JSON.stringify(unlockedServers.value));
 
-            admin.value = { level: data.admin_level, is_ga: false };
+            admin.value = { level: data.admin_level, is_ga: false, has_log_access: false };
 
             await refreshSessionStatus();
             startKeepAlive();
@@ -164,7 +178,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     function switchServer(server) {
-        const isUnlocked = unlockedServers.value.some((s) => s.server === server);
+        const isUnlocked = unlockedServers.value.some((s) => normalizeServerKey(s.server) === normalizeServerKey(server));
         if (!isUnlocked) {
             return false;
         }
@@ -174,7 +188,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     function isServerUnlocked(server) {
-        return unlockedServers.value.some((s) => s.server === server);
+        return unlockedServers.value.some((s) => normalizeServerKey(s.server) === normalizeServerKey(server));
     }
 
     // reimu would call this "spiritual cleansing". i call it "user forgot password again".
@@ -208,7 +222,7 @@ export const useAuthStore = defineStore('auth', () => {
                     // session died while we weren't looking (typical)
                 });
             }
-        }, 5 * 60 * 1000);
+        }, 60 * 1000);
         
         document.addEventListener('visibilitychange', handleVisibilityChange);
     }
@@ -235,6 +249,7 @@ export const useAuthStore = defineStore('auth', () => {
         canAccessCP,
         loading,
         initialized,
+        canViewAdminActions,
         canViewLogs,
         canViewRemoved,
         canViewGAActions,

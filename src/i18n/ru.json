@@ -173,8 +173,13 @@
       "mark_support": "Отметить как саппорта",
       "remove_support": "Снять саппорта",
       "mark_youtuber": "Отметить как медиа-партнёра",
-      "remove_youtuber": "Снять медиа-партнёра"
-    }
+      "remove_youtuber": "Снять медиа-партнёра",
+      "grant_log_access": "Выдать доступ к логам",
+      "revoke_log_access": "Снять доступ к логам"
+    },
+    "grant_log_access": "Выдать доступ к логам",
+    "log_access_updated": "Доступ к логам обновлён.",
+    "log_access_failed": "Не удалось обновить доступ к логам."
   },
   "logs": {
     "date_range_placeholder": "Выберите даты",
