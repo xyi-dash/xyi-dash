@@ -1,87 +1,42 @@
 <template>
-  <div class="card">
-    <div class="flex items-center gap-2 mb-6">
-      <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
-      <div class="font-semibold text-xl">Действия с администрацией</div>
+  <div class="flex flex-col gap-6">
+    <div class="card">
+      <div class="flex items-center gap-3 mb-2">
+        <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
+        <div class="font-semibold text-xl">{{ L.title }}</div>
+      </div>
+      <div class="text-muted-color">{{ L.subtitle }}</div>
     </div>
 
-    <div class="text-muted-color mb-6">
-      Создание заявки на действия с администраторами (предупреждения, изменение уровня)
-    </div>
-
-    <div class="grid grid-cols-12 gap-6">
-      <div class="col-span-12 md:col-span-6">
-        <label class="block text-sm font-medium mb-2">
-          Никнейм администратора <span class="text-red-500">*</span>
-        </label>
-        <InputText
-          v-model="formData.target_admin_name"
-          class="w-full"
-          :class="{ 'p-invalid': errors.target_admin_name }"
-          placeholder="Введите никнейм администратора"
-          maxlength="24"
-        />
-        <small v-if="errors.target_admin_name" class="p-error block mt-1">{{ errors.target_admin_name }}</small>
-      </div>
-
-      <div class="col-span-12 md:col-span-6">
-        <label class="block text-sm font-medium mb-2">
-          Действие <span class="text-red-500">*</span>
-        </label>
-        <Dropdown
-          v-model="formData.action_type"
-          :options="actionOptions"
-          optionLabel="label"
-          optionValue="value"
-          class="w-full"
-          :class="{ 'p-invalid': errors.action_type }"
-          placeholder="Выберите действие"
-        />
-        <small v-if="errors.action_type" class="p-error block mt-1">{{ errors.action_type }}</small>
-      </div>
-
-      <div class="col-span-12">
-        <label class="block text-sm font-medium mb-2">
-          Причина <span class="text-red-500">*</span>
-        </label>
-        <Textarea
-          v-model="formData.reason"
-          class="w-full"
-          :class="{ 'p-invalid': errors.reason }"
-          rows="5"
-          placeholder="Опишите причину создания карточки"
-          maxlength="1000"
-          :autoResize="true"
-        />
-        <div class="flex justify-content-between align-items-center mt-1">
-          <small v-if="errors.reason" class="p-error">{{ errors.reason }}</small>
-          <small class="text-muted-color ml-auto">{{ formData.reason.length }} / 1000</small>
+    <div class="card">
+      <div class="grid grid-cols-12 gap-5">
+        <div class="col-span-12 md:col-span-4">
+          <label class="block text-sm mb-2">{{ L.target }}</label>
+          <InputText v-model="form.target_name" class="w-full" :placeholder="L.targetPlaceholder" maxlength="32" />
         </div>
-      </div>
-
-      <div class="col-span-12">
-        <label class="block text-sm font-medium mb-2">Доказательства</label>
-        <Textarea
-          v-model="formData.evidence"
-          class="w-full"
-          rows="4"
-          placeholder="Ссылки на скриншоты, логи, видео и другие доказательства"
-          maxlength="2000"
-          :autoResize="true"
-        />
-        <small class="text-muted-color block mt-1">{{ formData.evidence.length }} / 2000</small>
-      </div>
-
-      <div class="col-span-12">
-        <div class="flex justify-end gap-2">
-          <Button label="Отмена" severity="secondary" @click="goBack" :disabled="loading" />
-          <Button
-            label="Создать карточку"
-            icon="pi pi-send"
-            @click="submitCard"
-            :loading="loading"
-            :disabled="!isFormValid"
-          />
+        <div class="col-span-12 md:col-span-4">
+          <label class="block text-sm mb-2">{{ L.type }}</label>
+          <Select v-model="form.card_type" :options="types" optionLabel="label" optionValue="value" class="w-full" :placeholder="L.typePlaceholder" />
+        </div>
+        <div v-if="form.card_type === 'admin_rename'" class="col-span-12 md:col-span-4">
+          <label class="block text-sm mb-2">{{ L.newNick }}</label>
+          <InputText v-model="form.new_nickname" class="w-full" maxlength="32" />
+        </div>
+        <div v-if="form.card_type === 'admin_donate'" class="col-span-12 md:col-span-4">
+          <label class="block text-sm mb-2">{{ L.donate }}</label>
+          <InputNumber v-model="form.donate_amount" class="w-full" :min="0" :useGrouping="false" />
+        </div>
+        <div class="col-span-12">
+          <label class="block text-sm mb-2">{{ L.reason }}</label>
+          <Textarea v-model="form.reason" class="w-full" rows="5" autoResize maxlength="2000" :placeholder="L.reasonPlaceholder" />
+        </div>
+        <div class="col-span-12">
+          <label class="block text-sm mb-2">{{ L.evidence }}</label>
+          <Textarea v-model="form.evidence" class="w-full" rows="3" autoResize maxlength="4000" :placeholder="L.evidencePlaceholder" />
+        </div>
+        <div class="col-span-12 flex justify-end gap-2">
+          <Button :label="L.clear" severity="secondary" outlined @click="resetForm" />
+          <Button :label="L.submit" icon="pi pi-send" :loading="loading" :disabled="!valid" @click="submit" />
         </div>
       </div>
     </div>
@@ -89,150 +44,36 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import api from '@/service/api';
-import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
-import Textarea from 'primevue/textarea';
+import { useAuthStore } from '@/stores/auth';
 import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import InputNumber from 'primevue/inputnumber';
+import Select from 'primevue/select';
+import Textarea from 'primevue/textarea';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const toast = useToast();
-
-const formData = ref({
-  target_admin_name: '',
-  action_type: '',
-  reason: '',
-  evidence: '',
-});
-
-const errors = ref({
-  target_admin_name: '',
-  action_type: '',
-  reason: '',
-});
-
-const loading = ref(false);
-
-const actionOptions = [
-  { label: 'Выдача предупреждения', value: 'warning_add' },
-  { label: 'Снятие предупреждения', value: 'warning_remove' },
-  { label: 'Повышение уровня', value: 'level_up' },
-  { label: 'Понижение уровня', value: 'level_down' },
+const L = {
+  title: '\u0417\u0430\u0434\u0430\u0447\u0430 \u043f\u043e \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0443', subtitle: '\u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443 \u0434\u043b\u044f \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0441\u0442\u0432\u0430: \u043f\u0440\u0435\u0434, \u0441\u043d\u044f\u0442\u0438\u0435 \u043f\u0440\u0435\u0434\u0430, \u043d\u0438\u043a, \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0438\u043b\u0438 \u0434\u043e\u043d\u0430\u0442.',
+  target: '\u041d\u0438\u043a \u0430\u0434\u043c\u0438\u043d\u0430', targetPlaceholder: '\u041d\u0430\u043f\u0440. yovimi.uchiha', type: '\u0422\u0438\u043f \u0437\u0430\u0434\u0430\u0447\u0438', typePlaceholder: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0442\u0438\u043f', newNick: '\u041d\u043e\u0432\u044b\u0439 \u043d\u0438\u043a', donate: '\u0421\u0443\u043c\u043c\u0430 \u0434\u043e\u043d\u0430\u0442\u0430', reason: '\u041f\u0440\u0438\u0447\u0438\u043d\u0430', reasonPlaceholder: '\u0427\u0442\u043e \u043d\u0443\u0436\u043d\u043e \u0441\u0434\u0435\u043b\u0430\u0442\u044c \u0438 \u043f\u043e\u0447\u0435\u043c\u0443', evidence: '\u0414\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044c\u0441\u0442\u0432\u0430', evidencePlaceholder: '\u0421\u0441\u044b\u043b\u043a\u0438, \u043b\u043e\u0433\u0438, \u043f\u043e\u044f\u0441\u043d\u0435\u043d\u0438\u044f', submit: '\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443', clear: '\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c', ok: '\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u0441\u043e\u0437\u0434\u0430\u043d\u0430', fail: '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443'
+};
+const types = [
+  { label: '\u0412\u044b\u0434\u0430\u0442\u044c \u043f\u0440\u0435\u0434', value: 'admin_warn' },
+  { label: '\u0421\u043d\u044f\u0442\u044c \u043f\u0440\u0435\u0434', value: 'admin_unwarn' },
+  { label: '\u041f\u043e\u0432\u044b\u0441\u0438\u0442\u044c', value: 'admin_promote' },
+  { label: '\u041f\u043e\u043d\u0438\u0437\u0438\u0442\u044c', value: 'admin_demote' },
+  { label: '\u041f\u043e\u043c\u0435\u043d\u044f\u0442\u044c \u043d\u0438\u043a', value: 'admin_rename' },
+  { label: '\u0412\u044b\u0434\u0430\u043d \u0434\u043e\u043d\u0430\u0442', value: 'admin_donate' }
 ];
-
-const isFormValid = computed(() => {
-  return (
-    formData.value.target_admin_name.trim().length > 0 &&
-    formData.value.action_type !== '' &&
-    formData.value.reason.trim().length > 0
-  );
-});
-
-const validateForm = () => {
-  errors.value = {
-    target_admin_name: '',
-    action_type: '',
-    reason: '',
-  };
-
-  let isValid = true;
-
-  if (!formData.value.target_admin_name.trim()) {
-    errors.value.target_admin_name = 'Укажите никнейм администратора';
-    isValid = false;
-  }
-
-  if (!formData.value.action_type) {
-    errors.value.action_type = 'Выберите действие';
-    isValid = false;
-  }
-
-  if (!formData.value.reason.trim()) {
-    errors.value.reason = 'Укажите причину';
-    isValid = false;
-  }
-
-  return isValid;
-};
-
-const submitCard = async () => {
-  if (!validateForm()) {
-    return;
-  }
-
-  loading.value = true;
-
-  try {
-    const response = await api.post('/admin/cards', formData.value);
-
-    toast.add({
-      severity: 'success',
-      summary: 'Успешно',
-      detail: 'Карточка создана и отправлена на рассмотрение',
-      life: 3000,
-    });
-
-    resetForm();
-  } catch (error) {
-    console.error('Failed to create card:', error);
-
-    if (error.response?.data?.errors) {
-      // Validation errors
-      const serverErrors = error.response.data.errors;
-      Object.keys(serverErrors).forEach((key) => {
-        if (errors.value.hasOwnProperty(key)) {
-          errors.value[key] = serverErrors[key][0];
-        }
-      });
-    } else if (error.response?.data?.error) {
-      toast.add({
-        severity: 'error',
-        summary: 'Ошибка',
-        detail: error.response.data.error === 'insufficient_level'
-          ? 'Недостаточно прав для создания карточек'
-          : 'Не удалось создать карточку',
-        life: 5000,
-      });
-    } else {
-      toast.add({
-        severity: 'error',
-        summary: 'Ошибка',
-        detail: 'Не удалось создать карточку',
-        life: 5000,
-      });
-    }
-  } finally {
-    loading.value = false;
-  }
-};
-
-const resetForm = () => {
-  formData.value = {
-    target_admin_name: '',
-    action_type: '',
-    reason: '',
-    evidence: '',
-  };
-  errors.value = {
-    target_admin_name: '',
-    action_type: '',
-    reason: '',
-  };
-};
-
-const goBack = () => router.push({ name: 'home' });
+const loading = ref(false);
+const form = ref({ card_type: '', target_name: '', reason: '', evidence: '', new_nickname: '', donate_amount: 0 });
+const valid = computed(() => form.value.card_type && form.value.target_name.trim() && form.value.reason.trim() && (form.value.card_type !== 'admin_rename' || form.value.new_nickname.trim()));
+function resetForm() { form.value = { card_type: '', target_name: '', reason: '', evidence: '', new_nickname: '', donate_amount: 0 }; }
+async function submit() { loading.value = true; try { await api.post(`/admin/cards${authStore.currentServer ? `?server=${authStore.currentServer}` : ''}`, form.value); toast.add({ severity: 'success', summary: 'OK', detail: L.ok, life: 3000 }); resetForm(); } catch { toast.add({ severity: 'error', summary: 'Error', detail: L.fail, life: 5000 }); } finally { loading.value = false; } }
+function goBack() { router.push({ name: 'home' }); }
 </script>
-
-<style scoped>
-.p-error {
-  color: #e24c4c;
-  font-size: 0.875rem;
-}
-
-.text-muted-color {
-  color: var(--text-color-secondary);
-}
-</style>

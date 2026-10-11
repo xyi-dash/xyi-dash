@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useLayout } from '@/layout/composables/layout';
 import api from '@/service/api';
+import AdminWorkStats from '@/components/AdminWorkStats.vue';
 
 const { t, locale } = useI18n();
 const authStore = useAuthStore();
@@ -14,6 +15,7 @@ const loading = ref(true);
 const normHistory = ref(null);
 const chartData = ref(null);
 const chartOptions = ref(null);
+const workStats = ref(null);
 
 const serverDisplayName = computed(() => {
     const map = { one: '01', two: '02', three: '03' };
@@ -23,6 +25,7 @@ const serverDisplayName = computed(() => {
 onMounted(async () => {
     await loadAdminData();
     await loadNormHistory();
+    await loadWorkStats();
 });
 
 async function loadAdminData() {
@@ -35,6 +38,16 @@ async function loadAdminData() {
         console.warn('failed to load admin data. the api giveth, the api taketh away.');
     } finally {
         loading.value = false;
+    }
+}
+
+async function loadWorkStats() {
+    try {
+        const serverParam = authStore.currentServer ? `?server=${authStore.currentServer}` : '';
+        const { data } = await api.get(`/admin/me/work-stats${serverParam}`);
+        workStats.value = data;
+    } catch (error) {
+        workStats.value = null;
     }
 }
 
@@ -216,6 +229,8 @@ const weeklyMet = computed(() => {
                     </div>
                 </div>
             </div>
+
+            <AdminWorkStats v-if="admin.level >= 6" :stats="workStats" />
 
             <div class="grid grid-cols-12 gap-4">
                 <div class="col-span-12 xl:col-span-8">

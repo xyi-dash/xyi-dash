@@ -14,6 +14,7 @@ const toast = useToast();
 
 const cardRef = ref(null);
 const loading = ref(false);
+const errorMessage = ref('');
 const data = ref([]);
 const first = ref(0);
 const page = ref(0);
@@ -99,6 +100,7 @@ onMounted(async () => {
 
 async function loadData(scroll = true) {
     loading.value = true;
+    errorMessage.value = '';
     try {
         const params = new URLSearchParams();
         params.append('page', page.value);
@@ -119,7 +121,10 @@ async function loadData(scroll = true) {
         
         updateUrl();
         if (scroll) scrollToTop();
-    } catch {
+    } catch (error) {
+        errorMessage.value = error.response?.data?.error || error.response?.data?.message || '?? ??????? ????????? ???? ?????????';
+        data.value = [];
+        totalRecords.value = 0;
         console.warn('reputation database pulled a boundary of life and death on us');
     } finally {
         loading.value = false;
@@ -203,6 +208,8 @@ function copyRow(rowData) {
         </div>
 
         <div class="card">
+            <Message v-if="errorMessage" severity="error" class="mb-4">{{ errorMessage }}</Message>
+
             <DataTable 
                 :value="data" 
                 :loading="loading" 

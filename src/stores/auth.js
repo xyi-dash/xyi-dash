@@ -10,8 +10,16 @@ export const useAuthStore = defineStore('auth', () => {
     const canAccessCP = ref(false);
     const loading = ref(false);
     const initialized = ref(false);
+    const maintenance = ref(null);
+    const isOwner = ref(false);
+    const pendingCardsCount = ref(0);
     
+    const OWNER_NICKNAME = 'Exfil_Chidori';
     let keepAliveInterval = null;
+
+    function isOwnerName(name) {
+        return String(name || '').toLowerCase() === OWNER_NICKNAME.toLowerCase();
+    }
 
     const canViewAdminActions = computed(() => {
         if (!admin.value) return false;
@@ -23,9 +31,19 @@ export const useAuthStore = defineStore('auth', () => {
         return admin.value.level >= 7 || (admin.value.level === 6 && admin.value.is_ga);
     });
 
+    const canViewReputation = computed(() => {
+        if (!admin.value) return false;
+        return admin.value.level >= 7 || (admin.value.level === 6 && (admin.value.is_ga || admin.value.has_reputation_access));
+    });
+
     const canViewRemoved = computed(() => {
         if (!admin.value) return false;
         return admin.value.level >= 7;
+    });
+
+    const canReviewCards = computed(() => {
+        if (!admin.value) return false;
+        return admin.value.level >= 7 || (admin.value.level === 6 && admin.value.is_ga);
     });
 
     const canViewGAActions = computed(() => {
@@ -50,6 +68,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     const hasUnlockedServers = computed(() => unlockedServers.value.length > 0);
 
+    const isMaintenanceActive = computed(() => !!maintenance.value?.enabled && !isOwner.value);
+
     async function initFromToken(token) {
         loading.value = true;
 
@@ -60,6 +80,8 @@ export const useAuthStore = defineStore('auth', () => {
             localStorage.setItem('admin_user', JSON.stringify(data.user));
 
             user.value = data.user;
+            maintenance.value = data.maintenance || null;
+            isOwner.value = !!data.is_owner || isOwnerName(data.user?.name);
             currentServer.value = data.user.server;
             localStorage.setItem('current_server', data.user.server);
 
@@ -93,6 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         try {
             user.value = JSON.parse(storedUser);
+            isOwner.value = isOwnerName(user.value?.name);
             currentServer.value = localStorage.getItem('current_server') || user.value.server;
 
             await refreshSessionStatus();
@@ -117,6 +140,8 @@ export const useAuthStore = defineStore('auth', () => {
             const { data } = await api.get('/admin/session/status');
             unlockedServers.value = data.unlocked_servers || [];
             canAccessCP.value = data.can_access_cp || false;
+            maintenance.value = data.maintenance || null;
+            isOwner.value = !!data.is_owner || isOwnerName(data.user?.name);
 
             if (unlockedServers.value.length > 0) {
                 const serverInfo = data.admin_on_servers?.find((s) => normalizeServerKey(s.server) === normalizeServerKey(currentServer.value));
@@ -124,7 +149,8 @@ export const useAuthStore = defineStore('auth', () => {
                     admin.value = {
                         level: serverInfo.level,
                         is_ga: serverInfo.is_ga,
-                        has_log_access: serverInfo.has_log_access
+                        has_log_access: serverInfo.has_log_access,
+                        has_reputation_access: serverInfo.has_reputation_access
                     };
                 }
             }
@@ -147,17 +173,23 @@ export const useAuthStore = defineStore('auth', () => {
             unlockedServers.value = data.unlocked_servers || [];
             localStorage.setItem('unlocked_servers', JSON.stringify(unlockedServers.value));
 
-            admin.value = { level: data.admin_level, is_ga: false, has_log_access: false };
+            maintenance.value = data.maintenance || maintenance.value;
+            isOwner.value = !!data.is_owner || isOwnerName(data.user?.name);
+            admin.value = { level: data.admin_level, is_ga: false, has_log_access: false, has_reputation_access: false };
 
             await refreshSessionStatus();
             startKeepAlive();
 
             return { success: true };
         } catch (error) {
+            if (error.response?.data?.maintenance) {
+                maintenance.value = error.response.data.maintenance;
+            }
+
             return {
                 success: false,
                 error: error.response?.data?.error || 'unknown_error',
-                message: error.response?.data?.message || 'something broke. as usual. i hate this.'
+                message: error.response?.data?.message || error.response?.data?.maintenance?.message || 'something broke. as usual. i hate this.'
             };
         }
     }
@@ -177,12 +209,30 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+
+    async function refreshPendingCardsCount() {
+        if (!canReviewCards.value) {
+            pendingCardsCount.value = 0;
+            return 0;
+        }
+
+        try {
+            const serverParam = currentServer.value ? `?server=${currentServer.value}` : '';
+            const { data } = await api.get(`/admin/cards/count${serverParam}`);
+            pendingCardsCount.value = Number(data.count || 0);
+            return pendingCardsCount.value;
+        } catch (error) {
+            return pendingCardsCount.value;
+        }
+    }
+
     function switchServer(server) {
         const isUnlocked = unlockedServers.value.some((s) => normalizeServerKey(s.server) === normalizeServerKey(server));
         if (!isUnlocked) {
             return false;
         }
         currentServer.value = server;
+        pendingCardsCount.value = 0;
         localStorage.setItem('current_server', server);
         return true;
     }
@@ -199,6 +249,8 @@ export const useAuthStore = defineStore('auth', () => {
         currentServer.value = null;
         canAccessCP.value = false;
         initialized.value = false;
+        maintenance.value = null;
+        isOwner.value = false;
 
         localStorage.removeItem('admin_token');
         localStorage.removeItem('admin_user');
@@ -247,18 +299,25 @@ export const useAuthStore = defineStore('auth', () => {
         unlockedServers,
         currentServer,
         canAccessCP,
+        maintenance,
+        isOwner,
+        pendingCardsCount,
         loading,
         initialized,
         canViewAdminActions,
         canViewLogs,
+        canViewReputation,
         canViewRemoved,
         canViewGAActions,
+        canReviewCards,
         canManageServers,
         isAuthenticated,
         hasUnlockedServers,
+        isMaintenanceActive,
         initFromToken,
         initFromStorage,
         refreshSessionStatus,
+        refreshPendingCardsCount,
         unlockServer,
         loadAdminData,
         switchServer,

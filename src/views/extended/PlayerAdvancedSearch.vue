@@ -28,6 +28,8 @@ const defaultFilters = () => ({
     level_max: null,
     kills_min: null,
     kills_max: null,
+    deaths_min: null,
+    deaths_max: null,
     cash_min: null,
     cash_max: null,
     donate_min: null,
@@ -46,6 +48,7 @@ function initiateSearch() {
     const hasFilters = f.nickname || f.account_id || f.ip || f.email ||
         f.level_min !== null || f.level_max !== null ||
         f.kills_min !== null || f.kills_max !== null ||
+        f.deaths_min !== null || f.deaths_max !== null ||
         f.cash_min !== null || f.cash_max !== null ||
         f.donate_min !== null || f.donate_max !== null;
 
@@ -89,6 +92,8 @@ async function executeSearch() {
         if (f.level_max !== null) params.append('level_max', f.level_max);
         if (f.kills_min !== null) params.append('kills_min', f.kills_min);
         if (f.kills_max !== null) params.append('kills_max', f.kills_max);
+        if (f.deaths_min !== null) params.append('deaths_min', f.deaths_min);
+        if (f.deaths_max !== null) params.append('deaths_max', f.deaths_max);
         if (f.cash_min !== null) params.append('cash_min', f.cash_min);
         if (f.cash_max !== null) params.append('cash_max', f.cash_max);
         if (f.donate_min !== null) params.append('donate_min', f.donate_min);
@@ -189,6 +194,13 @@ const goBack = () => router.push({ name: 'extended-players' });
                     <div class="flex gap-2">
                         <InputNumber v-model="filters.kills_min" :placeholder="$t('common.min')" :min="0" @keyup.enter="initiateSearch" />
                         <InputNumber v-model="filters.kills_max" :placeholder="$t('common.max')" :min="0" @keyup.enter="initiateSearch" />
+                    </div>
+                </div>
+                <div class="flex flex-col grow basis-0 gap-2">
+                    <label>{{ $t('extended.player_search.deaths_range') }}</label>
+                    <div class="flex gap-2">
+                        <InputNumber v-model="filters.deaths_min" :placeholder="$t('common.min')" :min="0" @keyup.enter="initiateSearch" />
+                        <InputNumber v-model="filters.deaths_max" :placeholder="$t('common.max')" :min="0" @keyup.enter="initiateSearch" />
                     </div>
                 </div>
                 <div class="flex flex-col grow basis-0 gap-2">

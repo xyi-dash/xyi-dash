@@ -173,8 +173,18 @@
       "mark_support": "Mark as Support",
       "remove_support": "Remove Support",
       "mark_youtuber": "Mark as YouTuber",
-      "remove_youtuber": "Remove YouTuber"
-    }
+      "remove_youtuber": "Remove YouTuber",
+      "grant_log_access": "Grant Log Access",
+      "revoke_log_access": "Revoke Log Access",
+      "grant_reputation_access": "Grant Reputation Access",
+      "revoke_reputation_access": "Revoke Reputation Access"
+    },
+    "grant_log_access": "Grant log access",
+    "log_access_updated": "Log access updated.",
+    "log_access_failed": "Failed to update log access.",
+    "grant_reputation_access": "Grant reputation access",
+    "reputation_access_updated": "Reputation access updated.",
+    "reputation_access_failed": "Failed to update reputation access."
   },
   "logs": {
     "date_range_placeholder": "Select dates",
@@ -291,6 +301,7 @@
       "partial_match": "Partial match",
       "level_range": "Level range",
       "kills_range": "Kills range",
+      "deaths_range": "Deaths range",
       "cash_range": "Cash range",
       "donate_range": "Donate range",
       "no_players": "Player not found. Maybe they finally touched grass!?",

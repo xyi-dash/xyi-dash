@@ -14,20 +14,39 @@ const model = computed(() => {
         {
             label: t('nav.home'),
             items: [
+                { label: 'Главная', icon: 'pi pi-fw pi-th-large', to: '/overview' },
+                { label: 'Форум: жалобы', icon: 'pi pi-fw pi-comments', to: '/forum-complaints' },
                 { label: t('nav.dashboard'), icon: 'pi pi-fw pi-home', to: '/' },
                 { label: t('nav.admin_list'), icon: 'pi pi-fw pi-users', to: '/admins' }
             ]
         }
     ];
 
-    if (authStore.canViewLogs) {
-        items.push({
-            label: t('nav.logs'),
-            items: [
-                { label: t('nav.actions'), icon: 'pi pi-fw pi-list', to: '/logs/actions' },
+    if (authStore.admin && authStore.admin.level >= 1) {
+        items[0].items.push({ label: 'Колесо удачи', icon: 'pi pi-fw pi-gift', to: '/luck-wheel' });
+    }
+
+    if (authStore.canViewAdminActions || authStore.canViewLogs || authStore.canViewReputation) {
+        const logItems = [];
+
+        if (authStore.canViewAdminActions) {
+            logItems.push({ label: t('nav.actions'), icon: 'pi pi-fw pi-list', to: '/logs/actions' });
+        }
+
+        if (authStore.canViewLogs) {
+            logItems.push(
                 { label: t('nav.warnings'), icon: 'pi pi-fw pi-exclamation-triangle', to: '/logs/warnings' },
                 { label: t('nav.purchases'), icon: 'pi pi-fw pi-shopping-cart', to: '/logs/purchases' }
-            ]
+            );
+        }
+
+        if (authStore.canViewReputation) {
+            logItems.push({ label: t('nav.reputation'), icon: 'pi pi-fw pi-star', to: '/logs/reputation' });
+        }
+
+        items.push({
+            label: t('nav.logs'),
+            items: logItems
         });
     }
 
@@ -35,7 +54,6 @@ const model = computed(() => {
         const logsSection = items.find((i) => i.label === t('nav.logs'));
         if (logsSection) {
             logsSection.items.push({ label: t('nav.removed'), icon: 'pi pi-fw pi-user-minus', to: '/logs/removed' });
-            logsSection.items.push({ label: t('nav.reputation'), icon: 'pi pi-fw pi-star', to: '/logs/reputation' });
         }
 
         items.push({
@@ -49,6 +67,7 @@ const model = computed(() => {
                 { label: t('nav.matchmaking'), icon: 'pi pi-fw pi-chart-bar', to: '/extended/matchmaking' },
                 { label: t('nav.money'), icon: 'pi pi-fw pi-dollar', to: '/extended/money' },
                 { label: t('nav.accessories'), icon: 'pi pi-fw pi-box', to: '/extended/accessories' },
+                { label: 'Выдача аксессуаров', icon: 'pi pi-fw pi-gift', to: '/extended/accessory-issue' },
                 { label: 'Черный список', icon: 'pi pi-fw pi-times-circle', to: '/extended/blacklist' }
             ]
         });
@@ -56,7 +75,15 @@ const model = computed(() => {
 
     // Admin Cards for level 6+
     if (authStore.admin && authStore.admin.level >= 6) {
-        const extendedSection = items.find((i) => i.label === t('nav.extended'));
+        let extendedSection = items.find((i) => i.label === t('nav.extended'));
+        if (!extendedSection) {
+            extendedSection = {
+                label: t('nav.extended'),
+                items: []
+            };
+            items.push(extendedSection);
+        }
+
         if (extendedSection) {
             const cardsItems = [
                 { label: 'Действия с администрацией', icon: 'pi pi-fw pi-exclamation-triangle', to: '/extended/admin-warnings' },
@@ -64,9 +91,9 @@ const model = computed(() => {
             ];
 
             // Add pending cards and history for level 7+
-            if (authStore.canViewRemoved) {
+            if (authStore.canReviewCards) {
                 cardsItems.push(
-                    { label: 'Карточки в ожидании', icon: 'pi pi-fw pi-clock', to: '/extended/pending-cards' },
+                    { label: 'Карточки в ожидании', icon: 'pi pi-fw pi-clock', to: '/extended/pending-cards' , badge: authStore.pendingCardsCount },
                     { label: 'История карточек', icon: 'pi pi-fw pi-history', to: '/extended/card-history' }
                 );
             }
@@ -75,6 +102,7 @@ const model = computed(() => {
                 label: 'Карточки',
                 icon: 'pi pi-fw pi-file',
                 path: '/cards',
+                badge: authStore.canReviewCards ? authStore.pendingCardsCount : 0,
                 items: cardsItems
             });
         }
@@ -87,12 +115,36 @@ const model = computed(() => {
         }
     }
 
-    if (authStore.canManageServers) {
+    if (authStore.canManageServers || authStore.admin?.level >= 8 || authStore.isOwner) {
+        const manageItems = [];
+
+        if (authStore.admin?.level >= 8) {
+            manageItems.push({ label: t('nav.news'), icon: 'pi pi-fw pi-megaphone', to: '/manage/news' });
+        }
+
+        if (authStore.admin?.level >= 8) {
+            manageItems.push({ label: t('nav.servers'), icon: 'pi pi-fw pi-server', to: '/manage/servers' });
+        }
+
+        if (authStore.admin?.level >= 8) {
+            manageItems.push({ label: 'База данных', icon: 'pi pi-fw pi-database', to: '/manage/database' });
+        }
+
+        if (authStore.isOwner) {
+            manageItems.push({ label: 'Техработы', icon: 'pi pi-fw pi-lock', to: '/manage/maintenance' });
+        }
+
         items.push({
             label: t('nav.management'),
+            items: manageItems
+        });
+    }
+
+    if (authStore.admin && (authStore.admin.level >= 7 || (authStore.admin.level === 6 && authStore.admin.is_ga))) {
+        items.push({
+            label: 'АНАЛИТИКА',
             items: [
-                { label: t('nav.news'), icon: 'pi pi-fw pi-megaphone', to: '/manage/news' },
-                { label: t('nav.servers'), icon: 'pi pi-fw pi-server', to: '/manage/servers' }
+                { label: 'Аналитика старшей адм.', icon: 'pi pi-fw pi-chart-line', to: '/manage/senior-analytics' }
             ]
         });
     }

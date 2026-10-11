@@ -175,11 +175,16 @@
       "mark_youtuber": "Отметить как медиа-партнёра",
       "remove_youtuber": "Снять медиа-партнёра",
       "grant_log_access": "Выдать доступ к логам",
-      "revoke_log_access": "Снять доступ к логам"
+      "revoke_log_access": "Снять доступ к логам",
+      "grant_reputation_access": "Выдать доступ к репутации",
+      "revoke_reputation_access": "Снять доступ к репутации"
     },
     "grant_log_access": "Выдать доступ к логам",
     "log_access_updated": "Доступ к логам обновлён.",
-    "log_access_failed": "Не удалось обновить доступ к логам."
+    "log_access_failed": "Не удалось обновить доступ к логам.",
+    "grant_reputation_access": "Выдать доступ к репутации",
+    "reputation_access_updated": "Доступ к репутации обновлён.",
+    "reputation_access_failed": "Не удалось обновить доступ к репутации."
   },
   "logs": {
     "date_range_placeholder": "Выберите даты",
@@ -271,7 +276,7 @@
       "from_placeholder": "От игрока",
       "to_placeholder": "Кому",
       "all_types": "Все типы",
-      "no_logs": "dick and wang"
+      "no_logs": "Логов репутации не найдено"
     }
   },
   "extended": {
@@ -296,6 +301,7 @@
       "partial_match": "Частичное совпадение",
       "level_range": "Диапазон уровня",
       "kills_range": "Диапазон убийств",
+      "deaths_range": "Диапазон смертей",
       "cash_range": "Диапазон денег",
       "donate_range": "Диапазон доната",
       "no_players": "Игрок не найден. Неужели он вышел потрогать траву?!",

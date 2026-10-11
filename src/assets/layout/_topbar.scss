@@ -17,6 +17,7 @@
         width: 20rem;
         display: flex;
         align-items: center;
+        gap: 0.5rem;
     }
 
     .layout-topbar-logo {
@@ -95,6 +96,30 @@
         gap: 1rem;
     }
 
+    .autumn-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        height: 1.75rem;
+        padding: 0 0.65rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, #d97706, var(--surface-border) 65%);
+        background:
+            linear-gradient(135deg, color-mix(in srgb, #f59e0b, transparent 86%), transparent),
+            color-mix(in srgb, var(--surface-card), #451a03 4%);
+        color: color-mix(in srgb, var(--text-color), #92400e 28%);
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+        box-shadow: 0 6px 18px color-mix(in srgb, #92400e, transparent 90%);
+    }
+
+    .autumn-leaf {
+        font-size: 0.95rem;
+        line-height: 1;
+    }
+
     .layout-desktop-only { display: flex; }
     .layout-mobile-only { display: none; }
     .layout-desktop-item { display: flex; }
@@ -107,6 +132,10 @@
 
         .layout-topbar-logo-container {
             width: auto;
+        }
+
+        .autumn-chip {
+            display: none;
         }
 
         .layout-menu-button {

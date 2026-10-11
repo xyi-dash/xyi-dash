@@ -19,7 +19,10 @@ const filters = ref({
     name: '',
     level: 'all',
     type: 'all',
-    status: 'all'
+    status: 'all',
+    todayMin: null,
+    threeDaysMin: null,
+    weekMin: null
 });
 const groupByLevel = ref(true);
 
@@ -50,16 +53,16 @@ const levelOptions = computed(() => {
     }));
 });
 
-const filterLevelOptions = computed(() => [
-    { label: t('admins.filters.all_levels'), value: 'all' },
-    { label: t('common.level') + ' 7', value: 7 },
-    { label: t('common.level') + ' 6', value: 6 },
-    { label: t('common.level') + ' 5', value: 5 },
-    { label: t('common.level') + ' 4', value: 4 },
-    { label: t('common.level') + ' 3', value: 3 },
-    { label: t('common.level') + ' 2', value: 2 },
-    { label: t('common.level') + ' 1', value: 1 }
-]);
+const filterLevelOptions = computed(() => {
+    const levels = adminList.value?.admins?.length
+        ? [...new Set(adminList.value.admins.map((admin) => admin.level))].sort((a, b) => b - a)
+        : [7, 6, 5, 4, 3, 2, 1];
+
+    return [
+        { label: t('admins.filters.all_levels'), value: 'all' },
+        ...levels.map((level) => ({ label: t('common.level') + ' ' + level, value: level }))
+    ];
+});
 
 const typeOptions = computed(() => [
     { label: t('admins.filters.all_types'), value: 'all' },
@@ -107,7 +110,28 @@ function filterAdmin(admin) {
     if (filters.value.type === 'sup' && !admin.is_support) return false;
     if (filters.value.status === 'online' && !admin.is_online) return false;
     if (filters.value.status === 'offline' && admin.is_online) return false;
+    if (!passesPlaytimeFilter(admin.playtime_today, filters.value.todayMin)) return false;
+    if (!passesPlaytimeFilter(admin.playtime_3days, filters.value.threeDaysMin)) return false;
+    if (!passesPlaytimeFilter(admin.playtime_week, filters.value.weekMin)) return false;
     return true;
+}
+
+function parsePlaytimeHours(value) {
+    if (!value) return 0;
+    const [hours = '0', minutes = '0'] = String(value).split(':');
+    return Number(hours || 0) + Number(minutes || 0) / 60;
+}
+
+function passesPlaytimeFilter(playtime, minimum) {
+    const min = Number(minimum);
+    if (!Number.isFinite(min) || min <= 0) return true;
+    return parsePlaytimeHours(playtime) >= min;
+}
+
+function clearPlaytimeFilters() {
+    filters.value.todayMin = null;
+    filters.value.threeDaysMin = null;
+    filters.value.weekMin = null;
 }
 
 function getAdminsByLevel(level) {
@@ -208,6 +232,27 @@ async function submitNewAdmin() {
                     <Button v-if="canAddAdmin" :label="$t('admins.add_admin')" icon="pi pi-plus" @click="openAddDialog" />
                 </div>
             </div>
+
+            <div class="border-t border-surface-200 dark:border-surface-700 pt-4">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-medium">Фильтр по онлайну</label>
+                        <InputNumber v-model="filters.todayMin" inputClass="w-full" :min="0" :maxFractionDigits="1" :useGrouping="false" placeholder="Сегодня от, ч" />
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm text-muted-color">&nbsp;</label>
+                        <InputNumber v-model="filters.threeDaysMin" inputClass="w-full" :min="0" :maxFractionDigits="1" :useGrouping="false" placeholder="За 3 дня от, ч" />
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm text-muted-color">&nbsp;</label>
+                        <InputNumber v-model="filters.weekMin" inputClass="w-full" :min="0" :maxFractionDigits="1" :useGrouping="false" placeholder="За неделю от, ч" />
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm text-muted-color">&nbsp;</label>
+                        <Button label="Сбросить онлайн" icon="pi pi-filter-slash" severity="secondary" outlined @click="clearPlaytimeFilters" />
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="card">
@@ -225,9 +270,9 @@ async function submitNewAdmin() {
                         <DataTable v-if="expandedLevels[level]" :value="getAdminsByLevel(level)" stripedRows size="small" responsiveLayout="scroll">
                             <Column field="name" :header="$t('common.name')" style="width: 280px">
                                 <template #body="{ data }">
-                                    <span class="inline-flex items-center">
-                                        <Button v-if="canViewDetails" :label="data.name" link class="p-0" @click="openAdmin(data)" />
-                                        <span v-else>{{ data.name }}</span>
+                                    <span class="admin-name-cell">
+                                        <button v-if="canViewDetails" type="button" class="admin-name-link" @click="openAdmin(data)">{{ data.name }}</button>
+                                        <span v-else class="admin-name-text">{{ data.name }}</span>
                                         <Tag v-if="data.is_support" severity="info" size="small">{{ $t('admins.support') }}</Tag>
                                         <Tag v-if="data.is_youtuber" severity="danger" size="small">{{ $t('admins.media') }}</Tag>
                                     </span>
@@ -245,6 +290,7 @@ async function submitNewAdmin() {
                                     <span class="text-red-500">-{{ data.reputation?.down || 0 }}</span>
                                 </template>
                             </Column>
+                            <Column field="playtime_today" header="Сегодня" />
                             <Column field="playtime_3days" :header="$t('admins.three_days')" />
                             <Column field="playtime_week" :header="$t('admins.week')" />
                             <Column :header="$t('common.status')">
@@ -266,9 +312,9 @@ async function submitNewAdmin() {
                 <DataTable v-else :value="flatAdminList" stripedRows size="small" responsiveLayout="scroll">
                     <Column field="name" :header="$t('common.name')" style="width: 280px">
                         <template #body="{ data }">
-                            <span class="inline-flex items-center gap-2">
-                                <Button v-if="canViewDetails" :label="data.name" link class="p-0" @click="openAdmin(data)" />
-                                <span v-else>{{ data.name }}</span>
+                            <span class="admin-name-cell">
+                                <button v-if="canViewDetails" type="button" class="admin-name-link" @click="openAdmin(data)">{{ data.name }}</button>
+                                <span v-else class="admin-name-text">{{ data.name }}</span>
                                 <Tag v-if="data.is_support" severity="info" size="small">Support</Tag>
                                 <Tag v-if="data.is_youtuber" severity="danger" size="small">Media</Tag>
                             </span>
@@ -287,6 +333,7 @@ async function submitNewAdmin() {
                             <span class="text-red-500">-{{ data.reputation?.down || 0 }}</span>
                         </template>
                     </Column>
+                    <Column field="playtime_today" header="Сегодня" />
                     <Column field="playtime_3days" :header="$t('admins.three_days')" />
                     <Column field="playtime_week" :header="$t('admins.week')" />
                     <Column :header="$t('common.status')">
@@ -336,3 +383,41 @@ async function submitNewAdmin() {
         </Dialog>
     </Fluid>
 </template>
+
+<style scoped>
+.admin-name-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+}
+
+.admin-name-link {
+    display: inline;
+    min-width: 0;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--p-primary-color);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: left;
+    cursor: pointer;
+}
+
+.admin-name-link:hover {
+    text-decoration: underline;
+}
+
+.admin-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+}
+</style>

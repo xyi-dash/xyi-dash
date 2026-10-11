@@ -18,6 +18,15 @@ const editMode = ref(false);
 const saving = ref(false);
 const editData = ref({});
 
+const isGoogleEnabled = (value) => Number(value) === 1;
+const googleAuthenticatorEnabled = computed(() => isGoogleEnabled(player.value?.security?.google_type));
+const editableFields = computed(() => new Set(player.value?.editable_fields || []));
+const canEditPlayer = computed(() => !!player.value?.can_edit);
+
+function canEditField(field) {
+    return editableFields.value.has(field);
+}
+
 const getRankLabel = (rank) => t(`extended.player_stats.ranks.${rank}`);
 
 const clanRankLabel = computed(() => {
@@ -46,12 +55,13 @@ const goBack = () => router.push({ name: 'extended-players' });
 function startEdit() {
     editData.value = {
         name: player.value.name,
+        email: player.value.email || '',
         level: player.value.level,
         cash: player.value.cash,
         donate: player.value.donate?.money || 0,
         kills: player.value.kills,
         deaths: player.value.deaths,
-        google_type: player.value.security?.google_type || 0,
+        google_type: isGoogleEnabled(player.value.security?.google_type) ? 1 : 0,
         google_key: player.value.security?.google_key || ''
     };
     if (player.value.gangwar) {
@@ -82,15 +92,15 @@ function cancelEdit() {
 
 async function saveEdit() {
     // Валидация
-    if (editData.value.level < 1) {
-        toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Уровень должен быть больше 0', life: 3000 });
+    if (canEditField('level') && editData.value.level < 0) {
+        toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Уровень не может быть отрицательным', life: 3000 });
         return;
     }
-    if (editData.value.cash < 0 || editData.value.donate < 0) {
+    if ((canEditField('cash') && editData.value.cash < 0) || (canEditField('donate') && editData.value.donate < 0)) {
         toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Деньги и донат не могут быть отрицательными', life: 3000 });
         return;
     }
-    if (editData.value.kills < 0 || editData.value.deaths < 0) {
+    if (canEditField('combat') && (editData.value.kills < 0 || editData.value.deaths < 0)) {
         toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Убийства и смерти не могут быть отрицательными', life: 3000 });
         return;
     }
@@ -98,7 +108,7 @@ async function saveEdit() {
     saving.value = true;
     try {
         const serverParam = authStore.currentServer ? `?server=${authStore.currentServer}` : '';
-        await api.put(`/admin/players/${route.params.id}${serverParam}`, editData.value);
+        await api.put(`/admin/players/${route.params.id}${serverParam}`, editablePayload());
         toast.add({ severity: 'success', summary: 'Успешно', detail: 'Статистика игрока обновлена', life: 3000 });
         await loadPlayer();
         editMode.value = false;
@@ -110,10 +120,36 @@ async function saveEdit() {
         saving.value = false;
     }
 }
+
+function editablePayload() {
+    const payload = {};
+
+    if (canEditField('name')) payload.name = editData.value.name;
+    if (canEditField('email')) payload.email = editData.value.email;
+    if (canEditField('level')) payload.level = editData.value.level;
+    if (canEditField('cash')) payload.cash = editData.value.cash;
+    if (canEditField('donate')) payload.donate = editData.value.donate;
+    if (canEditField('combat')) {
+        payload.kills = editData.value.kills;
+        payload.deaths = editData.value.deaths;
+    }
+    if (canEditField('google')) {
+        payload.google_type = editData.value.google_type;
+        payload.google_key = editData.value.google_key;
+    }
+    if (canEditField('gangwar') && editData.value.gangwar) {
+        payload.gangwar = editData.value.gangwar;
+    }
+    if (canEditField('matchmaking') && editData.value.matchmaking) {
+        payload.matchmaking = editData.value.matchmaking;
+    }
+
+    return payload;
+}
 </script>
 
 <template>
-    <div class="flex flex-col gap-8">
+    <div class="player-stats-page flex flex-col gap-8">
         <div class="card">
             <div class="flex items-center gap-2 mb-4">
                 <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
@@ -126,7 +162,8 @@ async function saveEdit() {
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <div v-if="editMode" class="mb-2">
-                            <InputText v-model="editData.name" class="text-2xl font-medium w-full" />
+                            <InputText v-if="canEditField('name')" v-model="editData.name" class="text-2xl font-medium w-full" />
+                            <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">{{ player.name }}</div>
                         </div>
                         <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-2xl mb-2">{{ player.name }}</div>
                         <div class="flex flex-wrap gap-4 text-sm text-muted-color">
@@ -142,7 +179,7 @@ async function saveEdit() {
                     </div>
                 </div>
                 
-                <div v-if="!editMode && authStore.admin?.level >= 8" class="flex justify-end mt-4">
+                <div v-if="!editMode && canEditPlayer" class="flex justify-end mt-4">
                     <Button label="Редактировать" icon="pi pi-pencil" @click="startEdit" />
                 </div>
                 <div v-if="editMode" class="flex justify-end gap-2 mt-4">
@@ -164,7 +201,7 @@ async function saveEdit() {
                         <div class="flex justify-between mb-4">
                             <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.player_stats.level') }}</span>
-                                <InputNumber v-if="editMode" v-model="editData.level" :min="1" :max="999" class="w-full" />
+                                <InputNumber v-if="editMode && canEditField('level')" v-model="editData.level" :min="1" :max="999" class="w-full" />
                                 <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ player.level }}</div>
                             </div>
                             <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
@@ -178,7 +215,7 @@ async function saveEdit() {
                         <div class="flex justify-between mb-4">
                             <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.player_stats.cash') }}</span>
-                                <InputNumber v-if="editMode" v-model="editData.cash" :min="0" mode="currency" currency="USD" locale="en-US" class="w-full" />
+                                <InputNumber v-if="editMode && canEditField('cash')" v-model="editData.cash" :min="0" mode="currency" currency="USD" locale="en-US" class="w-full" />
                                 <div v-else class="text-green-500 font-medium text-xl">${{ player.cash?.toLocaleString() }}</div>
                             </div>
                             <div class="flex items-center justify-center bg-green-100 dark:bg-green-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
@@ -192,7 +229,7 @@ async function saveEdit() {
                         <div class="flex justify-between mb-4">
                             <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.player_stats.donate') }}</span>
-                                <InputNumber v-if="editMode" v-model="editData.donate" :min="0" suffix=" ₽" class="w-full" />
+                                <InputNumber v-if="editMode && canEditField('donate')" v-model="editData.donate" :min="0" suffix=" ₽" class="w-full" />
                                 <div v-else class="text-yellow-500 font-medium text-xl">{{ player.donate?.money || 0 }} ₽</div>
                             </div>
                             <div class="flex items-center justify-center bg-yellow-100 dark:bg-yellow-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
@@ -224,14 +261,14 @@ async function saveEdit() {
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.kills') }}</div>
                                 <div class="w-1/2">
-                                    <InputNumber v-if="editMode" v-model="editData.kills" :min="0" class="w-full" />
+                                    <InputNumber v-if="editMode && canEditField('combat')" v-model="editData.kills" :min="0" class="w-full" />
                                     <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.kills?.toLocaleString() }}</div>
                                 </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.deaths') }}</div>
                                 <div class="w-1/2">
-                                    <InputNumber v-if="editMode" v-model="editData.deaths" :min="0" class="w-full" />
+                                    <InputNumber v-if="editMode && canEditField('combat')" v-model="editData.deaths" :min="0" class="w-full" />
                                     <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.deaths?.toLocaleString() }}</div>
                                 </div>
                             </li>
@@ -252,28 +289,28 @@ async function saveEdit() {
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Grove Street</div>
                                 <div class="w-1/2">
-                                    <InputNumber v-if="editMode" v-model="editData.gangwar.grove" :min="0" class="w-full" />
+                                    <InputNumber v-if="editMode && canEditField('gangwar')" v-model="editData.gangwar.grove" :min="0" class="w-full" />
                                     <div v-else class="text-green-500 font-medium">{{ player.gangwar.grove?.toLocaleString() }}</div>
                                 </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Ballas</div>
                                 <div class="w-1/2">
-                                    <InputNumber v-if="editMode" v-model="editData.gangwar.ballas" :min="0" class="w-full" />
+                                    <InputNumber v-if="editMode && canEditField('gangwar')" v-model="editData.gangwar.ballas" :min="0" class="w-full" />
                                     <div v-else class="text-purple-500 font-medium">{{ player.gangwar.ballas?.toLocaleString() }}</div>
                                 </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Vagos</div>
                                 <div class="w-1/2">
-                                    <InputNumber v-if="editMode" v-model="editData.gangwar.vagos" :min="0" class="w-full" />
+                                    <InputNumber v-if="editMode && canEditField('gangwar')" v-model="editData.gangwar.vagos" :min="0" class="w-full" />
                                     <div v-else class="text-yellow-500 font-medium">{{ player.gangwar.vagos?.toLocaleString() }}</div>
                                 </div>
                             </li>
                             <li class="flex items-center py-4">
                                 <div class="text-muted-color w-1/2">Aztecas</div>
                                 <div class="w-1/2">
-                                    <InputNumber v-if="editMode" v-model="editData.gangwar.aztec" :min="0" class="w-full" />
+                                    <InputNumber v-if="editMode && canEditField('gangwar')" v-model="editData.gangwar.aztec" :min="0" class="w-full" />
                                     <div v-else class="text-cyan-500 font-medium">{{ player.gangwar.aztec?.toLocaleString() }}</div>
                                 </div>
                             </li>
@@ -287,9 +324,15 @@ async function saveEdit() {
                         <ul class="list-none p-0 m-0">
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">{{ $t('extended.player_stats.email') }}</div>
-                                <div class="text-surface-900 dark:text-surface-0 font-medium w-1/2 flex items-center gap-2">
-                                    {{ player.email || '-' }}
-                                    <i v-if="player.email_verified" class="pi pi-check-circle text-green-500"></i>
+                                <div class="w-1/2">
+                                    <div v-if="editMode && canEditField('email')" class="flex gap-2">
+                                        <InputText v-model="editData.email" class="flex-1" placeholder="Email" />
+                                        <Button icon="pi pi-trash" severity="danger" size="small" @click="editData.email = ''" />
+                                    </div>
+                                    <div v-else class="text-surface-900 dark:text-surface-0 font-medium flex items-center gap-2">
+                                        {{ player.email || '-' }}
+                                        <i v-if="player.email_verified" class="pi pi-check-circle text-green-500"></i>
+                                    </div>
                                 </div>
                             </li>
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
@@ -315,16 +358,16 @@ async function saveEdit() {
                             <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                                 <div class="text-muted-color w-1/2">Google Authenticator</div>
                                 <div class="w-1/2">
-                                    <Dropdown v-if="editMode" v-model="editData.google_type" :options="[{label: 'Да', value: 1}, {label: 'Нет', value: 0}]" optionLabel="label" optionValue="value" class="w-full" />
-                                    <Tag v-else :severity="player.security?.google_type === 1 ? 'success' : 'danger'" size="small">
-                                        {{ player.security?.google_type === 1 ? 'Да' : 'Нет' }}
+                                    <Dropdown v-if="editMode && canEditField('google')" v-model="editData.google_type" :options="[{label: 'Да', value: 1}, {label: 'Нет', value: 0}]" optionLabel="label" optionValue="value" class="w-full" />
+                                    <Tag v-else :severity="googleAuthenticatorEnabled ? 'success' : 'danger'" size="small">
+                                        {{ googleAuthenticatorEnabled ? '\u0414\u0430' : '\u041d\u0435\u0442' }}
                                     </Tag>
                                 </div>
                             </li>
                             <li class="flex items-center py-4">
                                 <div class="text-muted-color w-1/2">Google Key</div>
                                 <div class="w-1/2">
-                                    <div v-if="editMode" class="flex gap-2">
+                                    <div v-if="editMode && canEditField('google')" class="flex gap-2">
                                         <InputText v-model="editData.google_key" class="flex-1" placeholder="Google Key" />
                                         <Button icon="pi pi-trash" severity="danger" size="small" @click="editData.google_key = ''" />
                                     </div>
@@ -361,7 +404,7 @@ async function saveEdit() {
                         <div class="flex justify-between mb-4">
                             <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">ELO</span>
-                                <InputNumber v-if="editMode" v-model="editData.matchmaking.elo" :min="0" class="w-full" />
+                                <InputNumber v-if="editMode && canEditField('matchmaking')" v-model="editData.matchmaking.elo" :min="0" class="w-full" />
                                 <div v-else class="font-medium text-xl" :class="{ 'text-green-500': player.matchmaking.elo >= 1200, 'text-yellow-500': player.matchmaking.elo >= 1000 && player.matchmaking.elo < 1200, 'text-red-500': player.matchmaking.elo < 1000 }">{{ player.matchmaking.elo }}</div>
                             </div>
                             <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
@@ -373,7 +416,7 @@ async function saveEdit() {
                         <div class="flex justify-between mb-4">
                             <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.matchmaking.games') }}</span>
-                                <InputNumber v-if="editMode" v-model="editData.matchmaking.games" :min="0" class="w-full" />
+                                <InputNumber v-if="editMode && canEditField('matchmaking')" v-model="editData.matchmaking.games" :min="0" class="w-full" />
                                 <div v-else class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ player.matchmaking.games }}</div>
                             </div>
                         </div>
@@ -382,7 +425,7 @@ async function saveEdit() {
                         <div class="flex justify-between mb-4">
                             <div class="w-full">
                                 <span class="block text-muted-color font-medium mb-4">{{ $t('extended.matchmaking.wins') }}</span>
-                                <InputNumber v-if="editMode" v-model="editData.matchmaking.wins" :min="0" class="w-full" />
+                                <InputNumber v-if="editMode && canEditField('matchmaking')" v-model="editData.matchmaking.wins" :min="0" class="w-full" />
                                 <div v-else class="text-green-500 font-medium text-xl">{{ player.matchmaking.wins }}</div>
                             </div>
                         </div>
@@ -400,19 +443,19 @@ async function saveEdit() {
                     <li class="flex items-center py-4 border-b border-surface-200 dark:border-surface-700">
                         <div class="text-muted-color w-1/4">{{ $t('extended.matchmaking.kills') }}</div>
                         <div class="w-1/4">
-                            <InputNumber v-if="editMode" v-model="editData.matchmaking.kills" :min="0" class="w-full" />
+                            <InputNumber v-if="editMode && canEditField('matchmaking')" v-model="editData.matchmaking.kills" :min="0" class="w-full" />
                             <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.matchmaking.kills }}</div>
                         </div>
                         <div class="text-muted-color w-1/4">{{ $t('extended.matchmaking.deaths') }}</div>
                         <div class="w-1/4">
-                            <InputNumber v-if="editMode" v-model="editData.matchmaking.deaths" :min="0" class="w-full" />
+                            <InputNumber v-if="editMode && canEditField('matchmaking')" v-model="editData.matchmaking.deaths" :min="0" class="w-full" />
                             <div v-else class="text-surface-900 dark:text-surface-0 font-medium">{{ player.matchmaking.deaths }}</div>
                         </div>
                     </li>
                     <li class="flex items-center py-4">
                         <div class="text-muted-color w-1/4">{{ $t('extended.matchmaking.mvp') }}</div>
                         <div class="w-1/4">
-                            <InputNumber v-if="editMode" v-model="editData.matchmaking.mvp" :min="0" class="w-full" />
+                            <InputNumber v-if="editMode && canEditField('matchmaking')" v-model="editData.matchmaking.mvp" :min="0" class="w-full" />
                             <div v-else class="text-yellow-500 font-medium">{{ player.matchmaking.mvp }}</div>
                         </div>
                         <div class="text-muted-color w-1/4">{{ $t('extended.player_stats.mm_time') }}</div>
@@ -436,3 +479,39 @@ async function saveEdit() {
         </template>
     </div>
 </template>
+
+<style scoped>
+.player-stats-page {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.player-stats-page :deep(.card) {
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 8px;
+    background: rgba(18, 18, 22, 0.96);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+}
+
+.player-stats-page :deep(.p-button) {
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+.player-stats-page :deep(.p-button:not(.p-button-text):not(.p-button-secondary):not(.p-button-danger)) {
+    border: 0;
+    background: linear-gradient(135deg, #34d399, #22c55e);
+    color: #04110a;
+}
+
+.player-stats-page :deep(.p-button-secondary) {
+    border-color: rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.player-stats-page :deep(.p-inputtext),
+.player-stats-page :deep(.p-inputnumber-input),
+.player-stats-page :deep(.p-dropdown) {
+    border-radius: 8px;
+}
+</style>

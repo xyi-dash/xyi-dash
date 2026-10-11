@@ -5,6 +5,36 @@
     justify-content: space-between;
     padding: 6rem 2rem 0 2rem;
     transition: margin-left var(--layout-section-transition-duration);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.layout-main-container::before {
+    content: '🍁  🍂  🍃';
+    position: fixed;
+    top: 5.4rem;
+    right: 2.25rem;
+    z-index: -1;
+    pointer-events: none;
+    font-size: clamp(3rem, 8vw, 7rem);
+    line-height: 1;
+    letter-spacing: 0.18em;
+    opacity: 0.055;
+    filter: saturate(0.8);
+    transform: rotate(-10deg);
+}
+
+.layout-main-container::after {
+    content: '';
+    position: fixed;
+    inset: 4rem 0 0 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 18% 12%, color-mix(in srgb, #f59e0b, transparent 94%) 0 18rem, transparent 23rem),
+        radial-gradient(circle at 86% 22%, color-mix(in srgb, #92400e, transparent 95%) 0 14rem, transparent 20rem),
+        linear-gradient(135deg, color-mix(in srgb, #7c2d12, transparent 97%), transparent 42%);
 }
 
 .layout-main {

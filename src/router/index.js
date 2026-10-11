@@ -17,6 +17,16 @@ const router = createRouter({
                     component: () => import('@/views/Home.vue')
                 },
                 {
+                    path: 'overview',
+                    name: 'overview',
+                    component: () => import('@/views/Overview.vue')
+                },
+                {
+                    path: 'forum-complaints',
+                    name: 'forum-complaints',
+                    component: () => import('@/views/ForumComplaints.vue')
+                },
+                {
                     path: 'admins',
                     name: 'admins',
                     component: () => import('@/views/admins/List.vue')
@@ -27,10 +37,16 @@ const router = createRouter({
                     component: () => import('@/views/admins/Manage.vue')
                 },
                 {
+                    path: 'luck-wheel',
+                    name: 'luck-wheel',
+                    component: () => import('@/views/LuckWheel.vue'),
+                    meta: { requiresLevel: 1 }
+                },
+                {
                     path: 'logs/actions',
                     name: 'logs-actions',
                     component: () => import('@/views/logs/Actions.vue'),
-                    meta: { requiresLevel: 6, requiresGA: true }
+                    meta: { requiresLevel: 6, requiresLogAccess: true }
                 },
                 {
                     path: 'logs/warnings',
@@ -60,7 +76,7 @@ const router = createRouter({
                     path: 'logs/reputation',
                     name: 'logs-reputation',
                     component: () => import('@/views/logs/Reputation.vue'),
-                    meta: { requiresLevel: 7 }
+                    meta: { requiresLevel: 6, requiresReputationAccess: true }
                 },
                 {
                     path: 'extended/players',
@@ -123,6 +139,12 @@ const router = createRouter({
                     meta: { requiresLevel: 7 }
                 },
                 {
+                    path: 'extended/accessory-issue',
+                    name: 'extended-accessory-issue',
+                    component: () => import('@/views/extended/AccessoryIssue.vue'),
+                    meta: { requiresLevel: 7 }
+                },
+                {
                     path: 'extended/blacklist',
                     name: 'extended-blacklist',
                     component: () => import('@/views/extended/Blacklist.vue'),
@@ -150,25 +172,43 @@ const router = createRouter({
                     path: 'extended/pending-cards',
                     name: 'extended-pending-cards',
                     component: () => import('@/views/extended/PendingCards.vue'),
-                    meta: { requiresLevel: 7 }
+                    meta: { requiresLevel: 6, requiresCardReview: true }
                 },
                 {
                     path: 'extended/card-history',
                     name: 'extended-card-history',
                     component: () => import('@/views/extended/CardHistory.vue'),
-                    meta: { requiresLevel: 7 }
+                    meta: { requiresLevel: 6, requiresCardReview: true }
                 },
                 {
                     path: 'manage/news',
                     name: 'manage-news',
                     component: () => import('@/views/manage/News.vue'),
-                    meta: { requiresLevel: 8, requiresGA: true }
+                    meta: { requiresLevel: 8 }
                 },
                 {
                     path: 'manage/servers',
                     name: 'manage-servers',
                     component: () => import('@/views/manage/Servers.vue'),
-                    meta: { requiresLevel: 8, requiresGA: true }
+                    meta: { requiresLevel: 8 }
+                },
+                {
+                    path: 'manage/database',
+                    name: 'manage-database',
+                    component: () => import('@/views/manage/DatabaseBrowser.vue'),
+                    meta: { requiresLevel: 8 }
+                },
+                {
+                    path: 'manage/maintenance',
+                    name: 'manage-maintenance',
+                    component: () => import('@/views/manage/Maintenance.vue'),
+                    meta: { ownerOnly: true }
+                },
+                {
+                    path: 'manage/senior-analytics',
+                    name: 'manage-senior-analytics',
+                    component: () => import('@/views/manage/SeniorAnalytics.vue'),
+                    meta: { requiresLevel: 6, requiresGA: true }
                 }
             ]
         },
@@ -230,8 +270,18 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
+    if (authStore.isMaintenanceActive && to.name !== 'unlock') {
+        next({ name: 'unlock' });
+        return;
+    }
+
     if (to.meta.requiresUnlock && !authStore.hasUnlockedServers) {
         next({ name: 'unlock' });
+        return;
+    }
+
+    if (to.meta.ownerOnly && !authStore.isOwner) {
+        next({ name: 'access-denied' });
         return;
     }
 
@@ -244,8 +294,29 @@ router.beforeEach(async (to, from, next) => {
 
         const requiredLevel = to.meta.requiresLevel;
         const requiresGA = to.meta.requiresGA;
+        const requiresLogAccess = to.meta.requiresLogAccess;
 
-        const hasAccess = admin.level >= requiredLevel || (requiresGA && admin.level === 6 && admin.is_ga && requiredLevel === 6);
+        let hasAccess = admin.level >= requiredLevel;
+
+        if (to.meta.requiresMaxLevel && admin.level > to.meta.requiresMaxLevel && !authStore.isOwner) {
+            hasAccess = false;
+        }
+
+        if (requiresGA) {
+            hasAccess = admin.level > requiredLevel || (admin.level === 6 && admin.is_ga && requiredLevel === 6);
+        }
+
+        if (requiresLogAccess) {
+            hasAccess = admin.level > requiredLevel || (admin.level === 6 && (admin.is_ga || admin.has_log_access) && requiredLevel === 6);
+        }
+
+        if (to.meta.requiresReputationAccess) {
+            hasAccess = admin.level > requiredLevel || (admin.level === 6 && (admin.is_ga || admin.has_reputation_access) && requiredLevel === 6);
+        }
+
+        if (to.meta.requiresCardReview) {
+            hasAccess = admin.level >= 7 || (admin.level === 6 && admin.is_ga);
+        }
 
         if (!hasAccess) {
             next({ name: 'access-denied' });
